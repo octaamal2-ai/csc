@@ -18,10 +18,18 @@ export interface CitizenProfile {
   has_active_govt_business_loan: boolean;
 }
 
-export interface ChecklistItem {
-  rule: string;
+export interface CitationItem {
+  text: string;
   source_file: string;
   page_number: number;
+}
+
+export interface SchemeSynthesis {
+  scheme_name: string;
+  is_eligible: boolean;
+  eligibility_criteria: CitationItem[];
+  requirements_and_conditions: CitationItem[];
+  disqualification_reasons: CitationItem[];
 }
 
 export interface PdfCitation {
@@ -50,6 +58,10 @@ export const DEFAULT_PROFILE: CitizenProfile = {
   has_active_govt_business_loan: false,
 };
 
-export function isIneligibleRule(rule: string): boolean {
-  return rule.trim().toUpperCase().startsWith("NOT ELIGIBLE");
+export function schemeHasContent(scheme: SchemeSynthesis): boolean {
+  return (
+    scheme.eligibility_criteria.length > 0 ||
+    scheme.requirements_and_conditions.length > 0 ||
+    scheme.disqualification_reasons.length > 0
+  );
 }

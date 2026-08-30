@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from ai_service import build_retrieval_query, synthesize_checklist
-from models import ChecklistItem, CitizenProfile
+from models import CitizenProfile, SchemeSynthesis
 from vector_db import get_corpus_stats, ingest_pdf_corpus, query_relevant_chunks
 
 PDF_DIR = Path(__file__).resolve().parent / "data" / "pdfs"
@@ -54,8 +54,8 @@ def ingest_corpus(reset: bool = False) -> dict:
     return ingest_pdf_corpus(reset=reset)
 
 
-@app.post("/api/synthesize", response_model=list[ChecklistItem])
-def synthesize(profile: CitizenProfile) -> list[ChecklistItem]:
+@app.post("/api/synthesize", response_model=list[SchemeSynthesis])
+def synthesize(profile: CitizenProfile) -> list[SchemeSynthesis]:
     query = build_retrieval_query(profile)
     chunks = query_relevant_chunks(query_text=query, n_results=10)
     if not chunks:

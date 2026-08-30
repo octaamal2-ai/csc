@@ -1,5 +1,5 @@
 import { formatApiError } from "@/lib/errors";
-import type { ChecklistItem, CitizenProfile } from "@/lib/types";
+import type { CitizenProfile, SchemeSynthesis } from "@/lib/types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -37,7 +37,7 @@ export function getPdfUrl(sourceFile: string, pageNumber: number): string {
 
 export async function synthesizeEligibility(
   profile: CitizenProfile,
-): Promise<ChecklistItem[]> {
+): Promise<SchemeSynthesis[]> {
   const payload = buildSynthesisPayload(profile);
   console.log("Sending Payload:", payload);
 
@@ -61,7 +61,7 @@ export async function synthesizeEligibility(
     throw new SynthesisError(message, response.status, detail);
   }
 
-  const data = (await response.json()) as ChecklistItem[];
+  const data = (await response.json()) as SchemeSynthesis[];
   console.log("API Response:", data);
   return data;
 }

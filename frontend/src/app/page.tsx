@@ -10,7 +10,7 @@ import { PdfViewerSheet } from "@/components/pdf-viewer-sheet";
 import { synthesizeEligibility, SynthesisError } from "@/lib/api";
 import {
   DEFAULT_PROFILE,
-  type ChecklistItem,
+  type SchemeSynthesis,
   type CitizenProfile,
   type PdfCitation,
 } from "@/lib/types";
@@ -20,7 +20,7 @@ type ViewState = "idle" | "loading" | "success" | "error";
 export default function HomePage() {
   const [profile, setProfile] = useState<CitizenProfile>(DEFAULT_PROFILE);
   const [viewState, setViewState] = useState<ViewState>("idle");
-  const [results, setResults] = useState<ChecklistItem[]>([]);
+  const [results, setResults] = useState<SchemeSynthesis[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [activeCitation, setActiveCitation] = useState<PdfCitation | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -30,8 +30,8 @@ export default function HomePage() {
     setError(null);
 
     try {
-      const items = await synthesizeEligibility(profile);
-      setResults(items);
+      const schemes = await synthesizeEligibility(profile);
+      setResults(schemes);
       setViewState("success");
     } catch (err) {
       if (err instanceof SynthesisError) {
@@ -79,7 +79,7 @@ export default function HomePage() {
           {viewState === "loading" && <LoadingState />}
           {viewState === "success" && (
             <EligibilityResults
-              items={results}
+              schemes={results}
               onCitationClick={handleCitationClick}
             />
           )}

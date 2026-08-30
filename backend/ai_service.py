@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 from pydantic import ValidationError
 
-from models import ChecklistItem, CitizenProfile, SynthesisResponse
+from models import CitationItem, CitizenProfile, SchemeSynthesis, SynthesisResponse
 
 DEFAULT_MODEL = "gemini-3.6-flash"
 
@@ -53,16 +53,41 @@ def _allowed_citations(chunks: list[dict]) -> set[tuple[str, int]]:
     return {(chunk["source_file"], int(chunk["page_number"])) for chunk in chunks}
 
 
-def _filter_valid_items(items: list[ChecklistItem], allowed: set[tuple[str, int]]) -> list[ChecklistItem]:
-    valid: list[ChecklistItem] = []
-    for item in items:
-        citation = (item.source_file, item.page_number)
-        if citation in allowed:
-            valid.append(item)
-    return valid
+def _filter_valid_citations(
+    items: list[CitationItem], allowed: set[tuple[str, int]]
+) -> list[CitationItem]:
+    return [
+        item
+        for item in items
+        if (item.source_file, item.page_number) in allowed
+    ]
 
 
-def synthesize_checklist(profile: CitizenProfile, retrieved_chunks: list[dict]) -> list[ChecklistItem]:
+def _filter_valid_schemes(
+    schemes: list[SchemeSynthesis], allowed: set[tuple[str, int]]
+) -> list[SchemeSynthesis]:
+    filtered: list[SchemeSynthesis] = []
+    for scheme in schemes:
+        eligibility = _filter_valid_citations(scheme.eligibility_criteria, allowed)
+        requirements = _filter_valid_citations(scheme.requirements_and_conditions, allowed)
+        disqualifications = _filter_valid_citations(scheme.disqualification_reasons, allowed)
+        if not eligibility and not requirements and not disqualifications:
+            continue
+        filtered.append(
+            SchemeSynthesis(
+                scheme_name=scheme.scheme_name,
+                is_eligible=scheme.is_eligible,
+                eligibility_criteria=eligibility,
+                requirements_and_conditions=requirements,
+                disqualification_reasons=disqualifications,
+            )
+        )
+    return filtered
+
+
+def synthesize_checklist(
+    profile: CitizenProfile, retrieved_chunks: list[dict]
+) -> list[SchemeSynthesis]:
     if not retrieved_chunks:
         return []
 
@@ -78,7 +103,7 @@ def synthesize_checklist(profile: CitizenProfile, retrieved_chunks: list[dict]) 
 You are a Central Government scheme eligibility synthesizer for CSC/E-Seva operators.
 Evaluate ONLY against the indexed operational guidelines excerpts below for:
 - PM-KISAN (Revised PM-KISAN Operational Guidelines)
-- PM Vishwakarma (PM_Vishwakarma_Guidelines)
+- PM Vishwakarma (PM Vishwakarma Guidelines)
 
 Use ONLY the retrieved excerpts. Do not invent rules, thresholds, or documents.
 Even if the provided text chunks do not perfectly match the exact input values, extract the
@@ -91,27 +116,28 @@ Citizen profile (deterministic UI inputs):
 Retrieved guideline excerpts (each chunk includes source_file and page_number):
 {context}
 
-Strict exclusion evaluation rules (apply before listing any eligibility benefit):
-1. If is_income_tax_payer is true → the citizen is NOT ELIGIBLE for PM-KISAN. Include an explicit
-   ineligibility item starting with "NOT ELIGIBLE:" citing the PM-KISAN source.
-2. If is_institutional_landholder is true → NOT ELIGIBLE for PM-KISAN (institutional landholder exclusion).
-3. If is_govt_employee_or_professional is true → NOT ELIGIBLE for PM-KISAN.
-4. If has_active_govt_business_loan is true → NOT ELIGIBLE for PM-KISAN.
-5. If monthly_pension is above the pension ceiling stated in the PM-KISAN guidelines → NOT ELIGIBLE for PM-KISAN.
-6. PM-KISAN generally targets farmer-beneficiaries; if occupation is not "Farmer", do not list PM-KISAN
-   benefits unless the excerpts explicitly support the occupation.
-7. PM Vishwakarma targets traditional artisans/trades; evaluate Carpenter, Blacksmith, Barber, Cobbler,
-   and "Other Traditional Trade" against PM Vishwakarma guidelines. Farmers should not receive PM Vishwakarma
-   benefits unless excerpts explicitly support it.
+Strict exclusion evaluation rules:
+1. If is_income_tax_payer is true → set PM-KISAN is_eligible to false and list reasons under disqualification_reasons.
+2. If is_institutional_landholder is true → PM-KISAN is_eligible false (institutional landholder exclusion).
+3. If is_govt_employee_or_professional is true → PM-KISAN is_eligible false.
+4. If has_active_govt_business_loan is true → PM-KISAN is_eligible false.
+5. If monthly_pension exceeds the pension ceiling in PM-KISAN guidelines → PM-KISAN is_eligible false.
+6. PM-KISAN targets landholding farmer-beneficiaries; if occupation is not "Farmer", set is_eligible false unless excerpts explicitly support the occupation.
+7. PM Vishwakarma targets traditional artisans/trades (Carpenter, Blacksmith, Barber, Cobbler, Other Traditional Trade).
 
-Task:
-1. Return a traceable checklist mixing eligibility requirements, required documents, benefits, AND explicit
-   NOT ELIGIBLE determinations where exclusion criteria apply.
-2. Prefix every ineligibility line with "NOT ELIGIBLE:" and name the scheme (PM-KISAN or PM Vishwakarma).
-3. Prefix eligible requirements/benefits with "ELIGIBLE:" or "REQUIREMENT:" where appropriate.
-4. Every item MUST cite the exact source_file and page_number from the chunk it came from.
-5. If the excerpts do not support a determination, omit it entirely.
-6. Return JSON only, matching the provided schema.
+Output schema — return JSON with a "schemes" array. Each scheme object MUST use:
+- scheme_name: exactly "PM-KISAN" or "PM Vishwakarma" (one object per scheme, never split one scheme across multiple objects)
+- is_eligible: boolean overall determination for this citizen under that scheme
+- eligibility_criteria: list of {{text, source_file, page_number}} — who qualifies, age/occupation/land thresholds met
+- requirements_and_conditions: list of {{text, source_file, page_number}} — documents, registration steps, benefit conditions, loan rules
+- disqualification_reasons: list of {{text, source_file, page_number}} — exclusion criteria that apply to this citizen (empty if eligible)
+
+Rules:
+1. Merge ALL rules from the same scheme into ONE scheme object under the same scheme_name.
+2. Every list item MUST cite the exact source_file and page_number from the chunk it came from.
+3. Do not duplicate the same point across lists unless it serves different purposes (eligibility vs requirement).
+4. If excerpts do not support a scheme determination, omit that scheme entirely.
+5. Return JSON only, matching the provided schema.
 """
 
     print(f"Retrieved {len(retrieved_chunks)} chunks: {retrieved_chunks}")
@@ -136,7 +162,7 @@ Task:
         parsed = SynthesisResponse.model_validate(payload)
 
     allowed = _allowed_citations(retrieved_chunks)
-    return _filter_valid_items(parsed.items, allowed)
+    return _filter_valid_schemes(parsed.schemes, allowed)
 
 
 def build_retrieval_query(profile: CitizenProfile) -> str:

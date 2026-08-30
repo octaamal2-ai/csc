@@ -24,14 +24,22 @@ class CitizenProfile(BaseModel):
     has_active_govt_business_loan: bool = False
 
 
-class ChecklistItem(BaseModel):
-    rule: str
+class CitationItem(BaseModel):
+    text: str
     source_file: str
     page_number: int = Field(..., ge=1)
 
 
+class SchemeSynthesis(BaseModel):
+    scheme_name: str
+    is_eligible: bool
+    eligibility_criteria: list[CitationItem] = Field(default_factory=list)
+    requirements_and_conditions: list[CitationItem] = Field(default_factory=list)
+    disqualification_reasons: list[CitationItem] = Field(default_factory=list)
+
+
 class SynthesisResponse(BaseModel):
-    items: list[ChecklistItem]
+    schemes: list[SchemeSynthesis]
 
 
 class PageExtraction(BaseModel):
