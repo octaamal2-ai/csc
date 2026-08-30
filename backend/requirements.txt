@@ -1,0 +1,17 @@
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+
+# Google Gemini (modern google-genai SDK)
+google-genai>=1.0.0
+
+# Vector database
+chromadb>=0.5.0
+
+# PDF processing (page-aware extraction)
+pymupdf>=1.24.0
+
+# Utilities
+python-multipart>=0.0.12
+python-dotenv>=1.0.0

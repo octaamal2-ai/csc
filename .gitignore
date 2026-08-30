@@ -1,0 +1,17 @@
+# Environment secrets
+.env
+backend/.env
+frontend/.env.local
+
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/
+frontend/.next/
+frontend/out/
+
+# Local databases
+backend/data/db/chroma/

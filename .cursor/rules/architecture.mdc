@@ -1,0 +1,40 @@
+---
+description: CSC Welfare Synthesizer architecture, constraints, and API contract
+alwaysApply: true
+---
+
+# E-Seva / CSC Central Scheme Synthesizer
+
+## Strict Constraints (NEVER VIOLATE)
+
+1. **No chat / no free-text input** — UI uses only sliders, toggles, checkboxes, selects, buttons.
+2. **Corpus-driven** — Rules must come from `backend/data/pdfs/` chunks only; never hallucinate eligibility criteria.
+3. **Mandatory traceability** — Every checklist item includes `source_file` and `page_number`; UI must open the cited PDF page.
+
+## Central Schemes
+
+- PM-KISAN (`RevisedPM-KISANOperationalGuidelines(English).pdf`)
+- PM Vishwakarma (`PM_Vishwakarma_Guidelines.pdf`)
+
+## API Contract
+
+`POST /api/synthesize` accepts `CitizenProfile`:
+
+```python
+age: int
+occupation: str  # Farmer | Carpenter | Blacksmith | Barber | Cobbler | Other Traditional Trade | Other
+land_holding_acres: float
+is_institutional_landholder: bool
+is_income_tax_payer: bool
+is_govt_employee_or_professional: bool
+monthly_pension: int
+has_active_govt_business_loan: bool
+```
+
+Response: `[{"rule": str, "source_file": str, "page_number": int}]`
+
+## UI Architecture
+
+- Left panel: age, occupation, land, pension sliders + exclusion switch toggles.
+- Right panel: traceable checklist with PDF page links and NOT ELIGIBLE items.
+- No chat sidebar or open-ended NL input.
